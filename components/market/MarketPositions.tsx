@@ -1,126 +1,155 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from 'react';
+import * as React from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Market, formatPriceAsPercentage } from '@/lib/sentient/market';
-
-interface Position {
-  id: string;
-  outcome: 'YES' | 'NO';
-  shares: string;
-  avgPrice: string;
-  currentValue: string;
-  profit: string;
-  profitPercentage: string;
-}
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { MarketPosition, OutcomeType, formatPriceAsPercentage } from '@/lib/sentient/market';
+import ClientWrapper from '../wrapper/client-wrapper';
 
 interface MarketPositionsProps {
-  positions: Position[];
+  positions: MarketPosition[];
   isLoading: boolean;
-  onSellShares: (positionId: string, amount: string) => Promise<void>;
+  onSellShares: (outcome: OutcomeType, shares: string) => Promise<void>;
   isSelling: boolean;
-  error: Error | null;
+  error?: Error | null;
 }
 
-export function MarketPositions({ 
-  positions, 
-  isLoading, 
+export function MarketPositions({
+  positions,
+  isLoading,
   onSellShares,
   isSelling,
   error
 }: MarketPositionsProps) {
-  const [mounted, setMounted] = useState(false);
-  
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-  
-  if (!mounted || isLoading) {
+  const [sellAmounts, setSellAmounts] = useState<Record<string, string>>({});
+
+  const handleSellAmountChange = (positionIndex: number, value: string) => {
+    setSellAmounts(prev => ({
+      ...prev,
+      [positionIndex]: value
+    }));
+  };
+
+  const handleSellShares = async (position: MarketPosition, positionIndex: number) => {
+    const amount = sellAmounts[positionIndex] || '';
+    if (!amount || parseFloat(amount) <= 0) return;
+    
+    await onSellShares(position.outcome, amount);
+    
+    // Clear input after selling
+    setSellAmounts(prev => ({
+      ...prev,
+      [positionIndex]: ''
+    }));
+  };
+
+  if (isLoading) {
     return (
-      <Card>
+      <Card className="w-full">
         <CardHeader>
           <CardTitle>Your Positions</CardTitle>
+          <CardDescription>Your current positions in this market</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-20 bg-muted animate-pulse rounded" />
-        </CardContent>
-      </Card>
-    );
-  }
-  
-  if (positions.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Your Positions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-6">
-            <p className="text-muted-foreground">You don't have any positions in this market yet</p>
+          <div className="space-y-4">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
           </div>
         </CardContent>
       </Card>
     );
   }
-  
-  const handleSell = async (position: Position) => {
-    await onSellShares(position.id, position.shares);
-  };
-  
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Your Positions</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {positions.map((position) => (
-            <div key={position.id} className="border rounded-md p-4">
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <div className="font-medium">{position.outcome}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {position.shares} shares @ {formatPriceAsPercentage(position.avgPrice)}
-                  </div>
-                </div>
-                <Button 
-                  size="sm" 
-                  onClick={() => handleSell(position)}
-                  disabled={isSelling}
-                >
-                  {isSelling ? 'Processing...' : 'Sell'}
-                </Button>
-              </div>
-              
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <div className="text-muted-foreground mb-1">Current Value</div>
-                  <div>{position.currentValue}</div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground mb-1">Profit/Loss</div>
-                  <div className={parseFloat(position.profit) >= 0 ? 'text-green-500' : 'text-red-500'}>
-                    {parseFloat(position.profit) >= 0 ? '+' : ''}{position.profit}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground mb-1">Change</div>
-                  <div className={parseFloat(position.profitPercentage) >= 0 ? 'text-green-500' : 'text-red-500'}>
-                    {parseFloat(position.profitPercentage) >= 0 ? '+' : ''}{position.profitPercentage}%
-                  </div>
-                </div>
-              </div>
-              
-              {error && (
-                <div className="mt-4 text-sm text-red-500">
-                  {error.message}
-                </div>
-              )}
+    <ClientWrapper>
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Your Positions</CardTitle>
+          <CardDescription>Your current positions in this market</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error.message}</AlertDescription>
+            </Alert>
+          )}
+          
+          {positions.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>You don't have any positions in this market yet</p>
+              <p className="text-sm mt-2">Buy shares to start trading</p>
             </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+          ) : (
+            <div className="space-y-4">
+              {positions.map((position, index) => (
+                <div key={`${position.marketId}-${position.outcome}-${index}`} className="border rounded-lg p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={position.outcome === 'YES' ? "default" : "secondary"}>
+                        {position.outcome}
+                      </Badge>
+                      <span className="font-medium">{position.shares} Shares</span>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Avg Price: {formatPriceAsPercentage(position.avgPrice)}
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Value: </span>
+                      <span className="font-medium">{position.value || '0'}</span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">P&L: </span>
+                      <span className={`font-medium ${
+                        parseFloat(position.pnl || '0') > 0 
+                          ? 'text-green-600' 
+                          : parseFloat(position.pnl || '0') < 0 
+                            ? 'text-red-600' 
+                            : ''
+                      }`}>
+                        {parseFloat(position.pnl || '0') > 0 ? '+' : ''}
+                        {position.pnl || '0'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Amount to sell"
+                      value={sellAmounts[index] || ''}
+                      onChange={(e) => handleSellAmountChange(index, e.target.value)}
+                      min="0"
+                      max={position.shares}
+                      step="0.01"
+                      disabled={isSelling}
+                    />
+                    <Button 
+                      variant="secondary"
+                      onClick={() => handleSellShares(position, index)}
+                      disabled={
+                        isSelling || 
+                        !sellAmounts[index] || 
+                        parseFloat(sellAmounts[index]) <= 0 ||
+                        parseFloat(sellAmounts[index]) > parseFloat(position.shares)
+                      }
+                    >
+                      {isSelling ? 'Selling...' : 'Sell'}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </ClientWrapper>
   );
-} 
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
@@ -21,6 +21,12 @@ export function MainLayout({ children }: MainLayoutProps) {
   const { address, isConnected } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
+  const [currentYear, setCurrentYear] = useState<number>(2024); // Default year
+
+  // Set current year on client-side only
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
 
   // Format address for display
   const formatAddress = (address: string | undefined) => {
@@ -116,7 +122,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             </div>
           </div>
           <div className="mt-6 text-center text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} Sentient Markets. All rights reserved.
+            &copy; {currentYear} Sentient Markets. All rights reserved.
           </div>
         </div>
       </footer>

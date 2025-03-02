@@ -1,3 +1,5 @@
+"use client"
+
 import '@/styles/globals.css';
 import type { AppProps } from 'next/app';
 import { createConfig, http, WagmiProvider } from 'wagmi';

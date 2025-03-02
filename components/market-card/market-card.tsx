@@ -1,12 +1,16 @@
-'use client';
+"use client"
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from "next/navigation";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Brain, Clock, Coins, ChevronRight, BarChart3 } from "lucide-react";
+import { formatEther } from "viem";
+import { DateTime } from "luxon";
+import { Button } from "@/components/ui/button";
+import { LoadingSkeleton } from '../ui/skeleton';
 import Link from 'next/link';
-import { formatDistanceToNow } from 'date-fns';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { formatEther } from 'viem';
+import ClientWrapper from '../wrapper/client-wrapper';
 
 interface Market {
   id: string;
@@ -21,73 +25,110 @@ interface MarketCardProps {
   market: Market;
 }
 
-export function MarketCard({ market }: MarketCardProps) {
-  const [mounted, setMounted] = useState(false);
+function getBadgeVariant(endTime: bigint) {
+  const currentTime = BigInt(Math.floor(Date.now() / 1000));
   
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-  
-  // Only render time-sensitive content on the client
-  if (!mounted) {
-    return (
-      <Card className="h-full flex flex-col">
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <CardTitle className="text-lg font-semibold">{market.question}</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="flex-grow">
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Ends:</span>
-              <span>Loading...</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Liquidity:</span>
-              <span>{formatEther(market.virtualLiquidity)} ETH</span>
-            </div>
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Link href={`/markets/${market.id}`} className="w-full">
-            <Button className="w-full">View Market</Button>
-          </Link>
-        </CardFooter>
-      </Card>
-    );
+  if (endTime <= currentTime) {
+    return "destructive";
   }
   
-  const isExpired = Date.now() > Number(market.endTime) * 1000;
-  const timeLeft = formatDistanceToNow(new Date(Number(market.endTime) * 1000), { addSuffix: true });
+  // If less than 24 hours remaining
+  if (endTime - currentTime < BigInt(86400)) {
+    return "warning";
+  }
   
+  return "default";
+}
+
+export function MarketCard({ market }: MarketCardProps) {
+  const router = useRouter();
+  const [yesPrice, setYesPrice] = useState<string>("0.5");
+  const [noPrice, setNoPrice] = useState<string>("0.5");
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Simulate loading prices
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // In a real implementation, these would come from the contract
+      setYesPrice((Math.random() * 0.5 + 0.25).toFixed(2));
+      setNoPrice((Math.random() * 0.5 + 0.25).toFixed(2));
+      setIsLoading(false);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [market.id]);
+
+  if (isLoading) {
+    return <LoadingSkeleton />;
+  }
+
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader>
-        <div className="flex justify-between items-start">
-          <CardTitle className="text-lg font-semibold">{market.question}</CardTitle>
-          <Badge>
-            {isExpired ? "Expired" : "Active"}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="flex-grow">
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Ends:</span>
-            <span>{timeLeft}</span>
+    <ClientWrapper>
+      <Card className="flex flex-col h-full bg-gradient-to-br from-gray-900 to-gray-800 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-indigo-500/20 group">
+        <div className="p-6 relative">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-bl-full" />
+          <div className="flex items-center justify-between mb-2 relative z-10">
+            <h3 className="text-xl font-bold text-white line-clamp-1">{market.question}</h3>
+            <Badge
+              variant={getBadgeVariant(market.endTime)}
+              className="font-mono bg-indigo-500/20 text-indigo-300"
+            >
+              {market.endTime <= BigInt(Math.floor(Date.now() / 1000)) ? "Ended" : "Trading"}
+            </Badge>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Liquidity:</span>
-            <span>{formatEther(market.virtualLiquidity)} ETH</span>
+          <p className="text-sm text-gray-400 line-clamp-2 relative z-10 mb-4">
+            ID: {market.id.substring(0, 10)}...{market.id.substring(market.id.length - 8)}
+          </p>
+        </div>
+
+        <div className="px-6">
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="flex flex-col items-center p-3 rounded-lg bg-gray-800/50 border border-indigo-500/20">
+              <Coins className="h-4 w-4 text-indigo-400" />
+              <span className="mt-2 font-mono font-medium text-indigo-300 text-sm">{formatEther(market.virtualLiquidity)} MODE</span>
+              <span className="text-xs text-gray-500">Liquidity</span>
+            </div>
+            <div className="flex flex-col items-center p-3 rounded-lg bg-gray-800/50 border border-indigo-500/20">
+              <BarChart3 className="h-4 w-4 text-indigo-400" />
+              <span className="mt-2 font-mono font-medium text-indigo-300 text-sm">{yesPrice} / {noPrice}</span>
+              <span className="text-xs text-gray-500">Yes/No Price</span>
+            </div>
+            <div className="flex flex-col items-center p-3 rounded-lg bg-gray-800/50 border border-indigo-500/20">
+              <Clock className="h-4 w-4 text-indigo-400" />
+              <span className="mt-2 font-mono font-medium text-indigo-300 text-sm">
+                {market.endTime <= BigInt(Math.floor(Date.now() / 1000)) 
+                  ? "Ended" 
+                  : DateTime.fromSeconds(Number(market.endTime)).toRelative() || "Unknown"}
+              </span>
+              <span className="text-xs text-gray-500">Ends</span>
+            </div>
+          </div>
+
+          <div className="flex gap-2 flex-wrap mb-4">
+            <Badge variant="outline" className="bg-indigo-500/10 text-indigo-300 border-indigo-500/50">
+              Prediction
+            </Badge>
+            <Badge variant="outline" className="bg-indigo-500/10 text-indigo-300 border-indigo-500/50">
+              MODE
+            </Badge>
+            <Badge variant="outline" className="bg-indigo-500/10 text-indigo-300 border-indigo-500/50">
+              AI
+            </Badge>
           </div>
         </div>
-      </CardContent>
-      <CardFooter>
-        <Link href={`/markets/${market.id}`} className="w-full">
-          <Button className="w-full">View Market</Button>
-        </Link>
-      </CardFooter>
-    </Card>
+
+        <div className="mt-auto p-6 pt-0">
+          <Link href={`/markets/${market.id}`}>
+            <Button
+              className="w-full bg-indigo-600 text-white hover:bg-indigo-700 transition-colors duration-300 group-hover:animate-pulse"
+            >
+              <Brain className="w-4 h-4 mr-2" />
+              View Market
+              <ChevronRight className="w-4 h-4 ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            </Button>
+          </Link>
+        </div>
+      </Card>
+    </ClientWrapper>
   );
-} 
+}

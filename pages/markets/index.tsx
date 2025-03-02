@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +8,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Market, formatPriceAsPercentage } from '@/lib/sentient/market';
+import ClientWrapper from '@/components/wrapper/client-wrapper';
+import { formatDistanceToNow } from 'date-fns';
 
 // Mock function to fetch markets (replace with actual API call)
 async function fetchMarkets(): Promise<Market[]> {
@@ -87,12 +91,6 @@ export default function MarketsPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [isClient, setIsClient] = useState(false);
-
-  // Handle client-side rendering
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   // Load markets
   useEffect(() => {
@@ -132,12 +130,10 @@ export default function MarketsPage() {
   }, [searchQuery, selectedCategory, markets]);
 
   // Get unique categories
-  const categories = [...new Set(markets.map(market => market.category).filter(Boolean))];
+  const categories = Array.from(new Set(markets.map(market => market.category).filter(Boolean)));
 
   // Format date for display - only run on client
   const formatDate = (date: Date) => {
-    if (!isClient) return '';
-    
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       month: 'short',
@@ -147,8 +143,6 @@ export default function MarketsPage() {
 
   // Calculate time remaining - only run on client
   const getTimeRemaining = (endTime: Date) => {
-    if (!isClient) return '';
-    
     const now = new Date();
     const timeRemaining = endTime.getTime() - now.getTime();
     
@@ -156,53 +150,11 @@ export default function MarketsPage() {
       return 'Ended';
     }
     
-    const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    
-    if (days > 0) {
-      return `${days}d ${hours}h remaining`;
-    } else {
-      return `${hours}h remaining`;
-    }
+    return formatDistanceToNow(endTime, { addSuffix: true });
   };
 
-  // If not mounted yet, show loading skeleton
-  if (!isClient) {
-    return (
-      <div className="container mx-auto py-8 px-4">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Prediction Markets</h1>
-            <p className="text-muted-foreground">
-              Trade on the outcome of future events with real-time market prices
-            </p>
-          </div>
-          <div className="mt-4 md:mt-0">
-            <Skeleton className="h-10 w-32" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Card key={i} className="w-full">
-              <CardHeader>
-                <Skeleton className="h-6 w-full mb-2" />
-                <Skeleton className="h-4 w-1/2" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-20 w-full" />
-              </CardContent>
-              <CardFooter>
-                <Skeleton className="h-10 w-full" />
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  return (
+  // Create a loading skeleton for the markets page
+  const loadingSkeleton = (
     <div className="container mx-auto py-8 px-4">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
         <div>
@@ -211,117 +163,144 @@ export default function MarketsPage() {
             Trade on the outcome of future events with real-time market prices
           </p>
         </div>
-        <Link href="/markets/create">
-          <Button className="mt-4 md:mt-0">Create Market</Button>
-        </Link>
+        <div className="mt-4 md:mt-0">
+          <Skeleton className="h-10 w-32" />
+        </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 mb-8">
-        <div className="w-full md:w-2/3">
-          <Input
-            placeholder="Search markets..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full"
-          />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <Card key={i} className="w-full">
+            <CardHeader>
+              <Skeleton className="h-6 w-full mb-2" />
+              <Skeleton className="h-4 w-1/2" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-20 w-full" />
+            </CardContent>
+            <CardFooter>
+              <Skeleton className="h-10 w-full" />
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <ClientWrapper fallback={loadingSkeleton}>
+      <div className="container mx-auto py-8 px-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Prediction Markets</h1>
+            <p className="text-muted-foreground">
+              Trade on the outcome of future events with real-time market prices
+            </p>
+          </div>
+          <Link href="/markets/create">
+            <Button className="mt-4 md:mt-0">Create Market</Button>
+          </Link>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant={selectedCategory === null ? "default" : "outline"}
-            onClick={() => setSelectedCategory(null)}
-            size="sm"
-          >
-            All
-          </Button>
-          {categories.map((category) => (
+
+        <div className="flex flex-col md:flex-row gap-4 mb-8">
+          <div className="w-full md:w-2/3">
+            <Input
+              placeholder="Search markets..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
             <Button
-              key={category}
-              variant={selectedCategory === category ? "default" : "outline"}
-              onClick={() => setSelectedCategory(category)}
+              variant={selectedCategory === null ? "default" : "outline"}
+              onClick={() => setSelectedCategory(null)}
               size="sm"
             >
-              {category}
+              All
             </Button>
-          ))}
+            {categories.map((category) => (
+              <Button
+                key={category}
+                variant={selectedCategory === category ? "default" : "outline"}
+                onClick={() => setSelectedCategory(category)}
+                size="sm"
+              >
+                {category}
+              </Button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Card key={i} className="w-full">
-              <CardHeader>
-                <Skeleton className="h-6 w-full mb-2" />
-                <Skeleton className="h-4 w-1/2" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-20 w-full" />
-              </CardContent>
-              <CardFooter>
-                <Skeleton className="h-10 w-full" />
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      ) : filteredMarkets.length === 0 ? (
-        <div className="text-center py-12">
-          <h3 className="text-xl font-medium mb-2">No markets found</h3>
-          <p className="text-muted-foreground">
-            Try adjusting your search or filters to find what you're looking for
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredMarkets.map((market) => (
-            <Link href={`/markets/${market.id}`} key={market.id}>
-              <Card className="w-full h-full hover:shadow-md transition-shadow cursor-pointer">
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Card key={i} className="w-full">
+                <CardHeader>
+                  <Skeleton className="h-6 w-full mb-2" />
+                  <Skeleton className="h-4 w-1/2" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-20 w-full" />
+                </CardContent>
+                <CardFooter>
+                  <Skeleton className="h-10 w-full" />
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
+        ) : filteredMarkets.length === 0 ? (
+          <div className="text-center py-12 border rounded-md">
+            <p className="text-muted-foreground mb-4">No markets found matching your criteria</p>
+            <Button onClick={() => { setSearchQuery(''); setSelectedCategory(null); }}>
+              Clear Filters
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredMarkets.map((market) => (
+              <Card key={market.id} className="w-full">
                 <CardHeader>
                   <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg line-clamp-2 mb-2">{market.question}</CardTitle>
-                      <CardDescription>
-                        {market.category && (
-                          <Badge variant="outline" className="mr-2">
-                            {market.category}
-                          </Badge>
-                        )}
-                        <span className="text-xs text-muted-foreground">
-                          Created {formatDate(market.createdAt)}
-                        </span>
-                      </CardDescription>
-                    </div>
+                    <CardTitle className="text-lg font-semibold">{market.question}</CardTitle>
+                    {market.category && (
+                      <Badge>
+                        {market.category}
+                      </Badge>
+                    )}
                   </div>
+                  <CardDescription>
+                    {formatDate(market.createdAt)}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-muted/50 p-3 rounded-lg text-center">
-                        <div className="text-sm text-muted-foreground mb-1">Yes</div>
-                        <div className="text-lg font-semibold">{formatPriceAsPercentage(market.yesPrice)}</div>
+                      <div>
+                        <div className="text-sm text-muted-foreground mb-1">YES Price</div>
+                        <div className="font-medium">{formatPriceAsPercentage(market.yesPrice)}</div>
                       </div>
-                      <div className="bg-muted/50 p-3 rounded-lg text-center">
-                        <div className="text-sm text-muted-foreground mb-1">No</div>
-                        <div className="text-lg font-semibold">{formatPriceAsPercentage(market.noPrice)}</div>
+                      <div>
+                        <div className="text-sm text-muted-foreground mb-1">NO Price</div>
+                        <div className="font-medium">{formatPriceAsPercentage(market.noPrice)}</div>
                       </div>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Ends:</span>
-                      <span>{getTimeRemaining(market.endTime)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Volume:</span>
-                      <span>${parseInt(market.volume).toLocaleString()}</span>
+                    <div>
+                      <div className="text-sm text-muted-foreground mb-1">Ends</div>
+                      <div className="font-medium">{getTimeRemaining(market.endTime)}</div>
                     </div>
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button className="w-full">Trade Now</Button>
+                  <Link href={`/markets/${market.id}`} className="w-full">
+                    <Button className="w-full">View Market</Button>
+                  </Link>
                 </CardFooter>
               </Card>
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </ClientWrapper>
   );
 } 

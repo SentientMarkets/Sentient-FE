@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect } from "react"
 import { MarketCard } from "@/components/market-card/market-card"
 import Link from "next/link"
